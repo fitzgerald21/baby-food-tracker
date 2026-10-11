@@ -1,5 +1,5 @@
 /* Network-first service worker: always fresh when online, works offline from cache. */
-const CACHE = "littlebites-v1";
+const CACHE = "littlebites-v2";
 const ASSETS = ["./", "index.html", "styles.css", "app.js", "data/foods.js", "data/guide.js", "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {

@@ -7,6 +7,7 @@ const SOURCES = [
   { t: "NIAID — Addendum guidelines for the prevention of peanut allergy in the US (2017)", u: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5217343/" },
   { t: "ASCIA — Infant feeding and allergy prevention (Australasian Society of Clinical Immunology and Allergy)", u: "https://allergy.org.au/hp/papers/infant-feeding-and-allergy-prevention" },
   { t: "AAP news release — Peanut allergies declined following early-introduction recommendation (2025)", u: "https://www.aap.org/en/news-room/news-releases/pediatrics2/2025/peanut-allergies-declined-following-recommendation-for-early-introduction" },
+  { t: "Evidence summary: baby-led approach and choking risk (BLISS randomized trials)", u: "https://nutrition-evidence.com/article/260876/a-baby-led-approach-to-eating-solids-and-risk-of-choking" },
   { t: "FDA — Advice about eating fish (mercury levels by species)", u: "https://www.fda.gov/food/consumers/advice-about-eating-fish" }
 ];
 
@@ -54,7 +55,53 @@ const PREP_MATRIX = [
     s3: "Family grains and breads in bite-size pieces." }
 ];
 
+/* Roadmap: what to try and when (general sequencing, flexible — babies vary). */
+const ROADMAP = [
+  { id: "r1", from: 0, to: 6.99, title: "First tastes", when: "First 1–2 weeks of solids (about 6 months)",
+    goal: "Get comfortable with the spoon/finger foods. One small meal a day; milk stays the main food. Lead with iron-rich foods.",
+    foods: ["infant_cereal", "beef", "chicken", "egg", "lentils", "avocado", "sweet_potato", "banana", "pear", "carrot"],
+    how: "Offer a few spoonfuls or a soft strip when baby is calm and not too hungry or sleepy. Iron-rich food at least once a day. If baby is low-risk for allergy, there's no need to hold off on egg and peanut: introduce them in these first weeks (see Allergens)." },
+  { id: "r2", from: 6, to: 7.99, title: "Build variety & allergens", when: "About 6–7 months",
+    goal: "Move to 2–3 small meals. Work through the major allergens one at a time and keep repeating them. Rotate colours and food groups.",
+    foods: ["peanut_butter", "egg", "yogurt", "bread", "pasta", "salmon", "tofu", "almond_butter", "tahini", "broccoli", "spinach", "oatmeal", "mango", "zucchini"],
+    how: "Introduce a new allergen every few days, early in the day; keep offering ones already introduced about weekly or more. Bitter and green vegetables are accepted better with repeated, pressure-free offers, so keep going." },
+  { id: "r3", from: 7, to: 8.99, title: "Textures, fingers & cup", when: "About 7–8 months",
+    goal: "Thicker mashes, soft finger foods, practising an open or straw cup with meals. Add legumes, more fish, shellfish and gentle herbs and spices.",
+    foods: ["black_beans", "chickpeas", "green_beans", "peas", "cod", "shrimp", "turkey", "quinoa", "cinnamon", "cumin", "blueberry", "strawberry"],
+    how: "Let baby feed themselves as well as being spoon-fed. Expect gagging and mess. Move from smooth purees to mashed and lumpy foods rather than staying on smooth for months." },
+  { id: "r4", from: 9, to: 11.99, title: "Lumpy foods & self-feeding", when: "9–11 months",
+    goal: "3 meals plus 1–2 snacks, mostly family foods with no added salt or sugar. Chopped, soft pieces for the pincer grasp. Make sure textures keep progressing.",
+    foods: ["cheese", "ricotta", "pancakes", "hummus", "white_beans", "lamb", "pork", "puffs", "cantaloupe", "mushroom"],
+    how: "Eat together as a family where possible. Offer a mix of finger foods and a spoon. Keep repeating foods baby rejected (8–15 tries is common) and vary how they're prepared." },
+  { id: "r5", from: 12, to: 999, title: "Toddler transition", when: "12 months and up",
+    goal: "Three meals and snacks from the family table, cut to size. Whole cow's milk can replace formula/breast milk as the main drink (with your pediatrician's guidance); honey is no longer age-restricted.",
+    foods: ["cow_milk", "honey", "strawberry", "grapes", "cheese", "yogurt"],
+    how: "Keep allergens in the regular rotation. Keep choking-hazard rules until about age 4: quarter grapes, no whole nuts or popcorn, no raw hard chunks." }
+];
+
+/* Evidence-based feeding approaches. Evidence strength is a plain-language summary, not a formal grade. */
+const EVIDENCE = [
+  { t: "Introduce peanut and egg early, then keep them in the diet", s: "Strong",
+    d: "Randomized trials (LEAP for peanut; EAT and other trials for egg) found introducing these allergens in infancy lowers allergy risk; waiting beyond 4–6 months has not been shown to protect. Guidelines from the NIAID, AAP and ASCIA follow this. High-risk babies (severe eczema, egg allergy) should be assessed by a doctor first." },
+  { t: "Prioritise iron-rich foods from the start", s: "Strong (consensus)",
+    d: "Breast milk is low in iron and a baby's own stores run down in the second half of the first year. Meat, fish, egg, beans, lentils, tofu and fortified cereal all help, and pairing plant iron with vitamin C improves absorption. Don't rely on fruit and vegetable purees alone." },
+  { t: "Purees, baby-led weaning, or a mix: all can work", s: "Moderate",
+    d: "Randomized trials of baby-led approaches (the BLISS studies in New Zealand) found no difference in growth between baby-led and spoon-fed babies, and no increase in choking when families were taught safe food shapes and how to tell gagging from choking. A mixed approach (some spoon-fed, some finger foods) is common and fine. What matters most is safe textures, iron-rich foods and baby leading the pace." },
+  { t: "Responsive feeding: follow hunger and fullness cues", s: "Moderate",
+    d: "Parents decide what, when and where; baby decides whether and how much. Pressuring, bribing or using food as a reward is linked in research with fussier eating and weaker appetite regulation. Stop when baby shows fullness cues." },
+  { t: "Repeated, pressure-free exposure builds acceptance", s: "Moderate",
+    d: "Studies of infants and toddlers show liking for new flavours, especially bitter vegetables, rises with repeated tastes. Many parents give up after 2–3 tries; research often cites around 8–15 exposures. Different preparations count too. A disliked food today is not a permanent dislike." },
+  { t: "Offer a wide range of flavours and textures early", s: "Moderate / limited",
+    d: "Early variety (including vegetables and, from 6 months, herbs and mild spices) is associated with broader acceptance later. Observational studies suggest that delaying lumpy textures well beyond about 9–10 months is linked to more feeding difficulties later, so keep progressing textures; this evidence is not from randomized trials." },
+  { t: "Eat together and let baby self-feed", s: "Limited / expert guidance",
+    d: "Family meals let baby copy eating, and self-feeding supports hand-mouth skills. Pediatric guidance encourages both, with the safety rules in the Guide." },
+  { t: "Breast milk or formula remain the main drink until 12 months", s: "Strong (consensus)",
+    d: "Solids add to, not replace, milk feeds in the first year. Water in small sips with meals; no juice before 12 months; cow's milk as a drink waits until after 12 months (CDC, AAP)." }
+];
+
 const GUIDE_SECTIONS = [
+  { id: "roadmap", title: "Roadmap: what to try next", icon: "🧭", html: "ROADMAP" },
+  { id: "evidence", title: "Best ways to feed: what the evidence says", icon: "🔬", html: "EVIDENCE" },
   { id: "ready", title: "Is baby ready for solids?", icon: "🪑", html: `
     <p>Most babies are ready around <b>6 months</b>. The CDC and AAP list these signs of readiness; look for <b>all</b> of them, not just one:</p>
     <ul>

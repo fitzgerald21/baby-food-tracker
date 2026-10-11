@@ -261,7 +261,7 @@ function viewHome(idx) {
   /* suggestions */
   const sg = suggestions(idx);
   if (sg.length) {
-    h += `<div class="sectionhead"><h2>Try next</h2><a href="#/foods" data-act="goFoods">Browse all ›</a></div><div class="card list">`;
+    h += `<div class="sectionhead"><h2>Try next</h2><a href="#/guide" data-act="goRoadmap">Full roadmap ›</a></div><div class="card list">`;
     sg.forEach(({ f, why }) => { h += `<div class="li click" data-act="food" data-id="${f.id}">${fimg(f, "sm")}<div class="grow"><div class="t">${esc(f.n)}</div><div class="s">${esc(why)}</div></div><span class="muted">›</span></div>`; });
     h += `</div>`;
   }
@@ -609,15 +609,33 @@ function viewAllergens(idx) {
 }
 
 /* ───────── GUIDE ───────── */
-function viewGuide() {
+function roadmapHtml(idx) {
+  const a = ageInfo(), m = a ? a.months + a.days / 30 : 6;
+  const cur = ROADMAP.find(r => m >= r.from && m <= r.to + 0.99) || ROADMAP[0];
+  const sg = suggestions(idx);
+  let h = `<p>A flexible order for introducing foods, based on current guidance. Babies vary, so move at your baby's pace and your pediatrician's advice.</p>`;
+  if (sg.length) h += `<div class="callout ok"><b>Based on what ${esc(babyName())} has tried so far, next up:</b><div class="chips" style="margin-top:8px">${sg.slice(0, 5).map(x => `<button class="chip" data-act="food" data-id="${x.f.id}">${fimg(x.f, "xs")} ${esc(x.f.n)}</button>`).join("")}</div></div>`;
+  ROADMAP.forEach(r => {
+    const isCur = r.id === cur.id && a;
+    h += `<div class="stagecard ${isCur ? "cur" : ""}"><b>${esc(r.title)}</b> <span class="muted small">· ${esc(r.when)}</span>${isCur ? ' <span class="chip tag">Your baby now</span>' : ""}
+      <p style="margin:6px 0"><b>Goal:</b> ${esc(r.goal)}</p>
+      <div class="chips" style="margin:8px 0">${r.foods.map(food).filter(Boolean).map(f => `<button class="chip ${idx.byFood.has(f.id) ? "on" : ""}" data-act="food" data-id="${f.id}">${fimg(f, "xs")} ${esc(f.n)}</button>`).join("")}</div>
+      <p style="margin:6px 0"><b>How:</b> ${esc(r.how)}</p></div>`;
+  });
+  return h + `<p class="small muted">Filled chips are foods already tried.</p>`;
+}
+function evidenceHtml() {
+  return `<p>What research and guidelines support, with a plain-language strength rating. Where evidence is limited, we say so.</p>` + EVIDENCE.map(e => `<div class="stagecard"><b>${esc(e.t)}</b> <span class="chip tag">${esc(e.s)}</span><p style="margin:6px 0">${esc(e.d)}</p></div>`).join("");
+}
+function viewGuide(idx) {
   const a = ageInfo(), cur = stageFor(a);
   const stageHtml = STAGES.map(s => `<div class="stagecard ${s.id === cur.id && a ? "cur" : ""}"><b>${s.label}</b>${s.id === cur.id && a ? ' <span class="chip tag">Your baby now</span>' : ""}<p style="margin:6px 0"><b>Textures:</b> ${esc(s.texture)}</p><p style="margin:6px 0"><b>How much:</b> ${esc(s.amount)}</p><p style="margin:6px 0"><b>Skills:</b> ${esc(s.skills)}</p></div>`).join("");
   const matrix = `<p>The same food is prepared differently as baby’s chewing and swallowing skills develop. <b>Steamed or roasted soft early; raw (grated, thin) later.</b></p><table class="tbl"><tr><th>Food type</th><th>6–8 mo</th><th>9–11 mo</th><th>12+ mo</th></tr>${PREP_MATRIX.map(r => `<tr><td><b>${esc(r.type)}</b></td><td>${esc(r.s1)}</td><td>${esc(r.s2)}</td><td>${esc(r.s3)}</td></tr>`).join("")}</table>`;
   let h = `<div class="pagehead"><h1>Guide & safety</h1><p>Evidence-based basics for starting solids${a ? ` — tuned for ${esc(babyName())} at ${esc(ageText(a))}` : ""}.</p></div>
   <div class="callout warn">General information only — not medical advice. Follow your pediatrician, who knows your baby’s history. If something seems wrong, trust your instincts and call.</div><div style="margin-top:14px">`;
   GUIDE_SECTIONS.forEach(s => {
-    const body = s.html === "STAGES" ? stageHtml : s.html === "PREPMATRIX" ? matrix : s.html;
-    const open = ui.guideOpen === s.id || (!ui.guideOpen && s.id === "ready" && false);
+    const body = s.html === "ROADMAP" ? roadmapHtml(idx) : s.html === "EVIDENCE" ? evidenceHtml() : s.html === "STAGES" ? stageHtml : s.html === "PREPMATRIX" ? matrix : s.html;
+    const open = ui.guideOpen === s.id || (!ui.guideOpen && s.id === "roadmap");
     h += `<details class="acc" id="g-${s.id}" ${open ? "open" : ""}><summary><span style="font-size:1.4rem">${s.icon}</span>${esc(s.title)}</summary><div class="acc-body">${body}</div></details>`;
   });
   h += `</div><div class="sectionhead"><h2>Sources</h2></div><div class="card"><ul style="margin:0;padding-left:20px">${SOURCES.map(s => `<li style="margin:6px 0"><a href="${s.u}" target="_blank" rel="noopener">${esc(s.t)}</a></li>`).join("")}</ul>
@@ -718,7 +736,7 @@ document.addEventListener("click", e => {
     case "food": openFood(id); break;
     case "editlog": openLog({ editId: id }); break;
     case "stagetab": openFood(id, v); break;
-    case "goFoods": break;
+    case "goRoadmap": ui.guideOpen = "roadmap"; if (ui.tab === "guide") render(); break;
     case "goGuideAllergy": ui.guideOpen = "allergy"; if (ui.tab === "guide") { render(); } break;
     case "allergen": location.hash = "#/allergens"; break;
     case "setcat": ui.foodCat = v; $("#view").innerHTML = viewFoods(buildIndex()); break;
