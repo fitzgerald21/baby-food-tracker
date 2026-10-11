@@ -169,13 +169,10 @@ function suggestions(idx) {
 
 /* ───────── food visuals ───────── */
 function fimg(f, size) {
+  // Every food shows an emoji (its own, else its category's); your meal photos live in the log, not here
   const cls = `fimg${size ? " " + size : ""}`;
-  const ph = S.photos[f.id];
-  if (ph) return `<span class="${cls}"><img alt="" src="${ph}"></span>`;
-  if (f.photo) return `<span class="${cls}"><img alt="" src="${f.photo}"></span>`;
-  if (f.e) return `<span class="${cls}" aria-hidden="true">${f.e}</span>`;
-  let h = 0; for (const ch of f.n) h = (h * 31 + ch.charCodeAt(0)) % 360;
-  return `<span class="${cls} letter" aria-hidden="true" style="background:hsl(${h} 45% 88%);color:hsl(${h} 45% 28%)">${esc(f.n[0].toUpperCase())}</span>`;
+  const cat = (CATS.find(c => c.id === f.c) || {}).emoji;
+  return `<span class="${cls}" aria-hidden="true">${f.e || cat || "🍽️"}</span>`;
 }
 const ratingEmoji = r => (RATINGS.find(x => x.v === r) || {}).e || "";
 function tagsFor(f) {
@@ -396,8 +393,7 @@ function openFood(id, stageTab) {
 
   b += `<div class="sectionhead"><h2>History</h2></div>`;
   b += s.logs.length ? `<div class="card list">${s.logs.map(logRow).join("")}</div>` : `<p class="muted">Not logged yet.</p>`;
-  b += `<div class="row wrap" style="margin-top:16px"><label class="btn sm sec" style="cursor:pointer">📷 ${S.photos[f.id] || f.photo ? "Change" : "Add"} photo<input type="file" accept="image/*" id="photoin" data-id="${f.id}" hidden></label>
-    ${S.photos[f.id] ? `<button class="btn sm sec" data-act="rmphoto" data-id="${f.id}">Remove photo</button>` : ""}
+  b += `<div class="row wrap" style="margin-top:16px">
     ${f.custom ? `<button class="btn sm sec" data-act="editcustom" data-id="${f.id}">✏️ Edit food</button>` : ""}</div>`;
   openSheet(f.n, b, `<button class="btn" data-act="log" data-food="${f.id}">＋ Log ${esc(f.n)}</button>`);
 }
