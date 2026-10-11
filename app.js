@@ -169,10 +169,12 @@ function suggestions(idx) {
 
 /* ───────── food visuals ───────── */
 function fimg(f, size) {
-  // Every food shows an emoji (its own, else its category's); your meal photos live in the log, not here
+  // Built-in foods show a photo (img/foods/<id>.jpg); custom foods, or a photo that fails to load, show an emoji
+  // (the food's own, else its category's). Your meal photos live in the log, not here.
   const cls = `fimg${size ? " " + size : ""}`;
-  const cat = (CATS.find(c => c.id === f.c) || {}).emoji;
-  return `<span class="${cls}" aria-hidden="true">${f.e || cat || "🍽️"}</span>`;
+  const emoji = f.e || (CATS.find(c => c.id === f.c) || {}).emoji || "🍽️";
+  if (f.custom) return `<span class="${cls}" aria-hidden="true">${emoji}</span>`;
+  return `<span class="${cls}" aria-hidden="true"><img src="img/foods/${f.id}.jpg" alt="" loading="lazy" onerror="this.replaceWith(document.createTextNode('${emoji}'))"></span>`;
 }
 const ratingEmoji = r => (RATINGS.find(x => x.v === r) || {}).e || "";
 function tagsFor(f) {
@@ -685,6 +687,7 @@ function openSettings() {
     <div class="row wrap"><label class="btn sm sec" style="cursor:pointer">📂 Choose file<input type="file" id="importfile" accept=".json,application/json" hidden></label><button class="btn sm sec" data-act="pasteimport">Paste backup text</button></div>
     <div class="sectionhead"><h2>About</h2></div>
     <p class="small muted">Little Bites is a free personal tracker. Food guidance is summarised from the CDC, AAP, NIAID, FDA and ASCIA (see Guide → Sources) and is not a substitute for medical advice. Photos you add are stored on this device and, when you’re signed in, in your private account backup.</p>
+    <details class="small muted" style="margin-top:10px"><summary>Photo credits</summary><p>Food pictures are from Wikimedia Commons. Public-domain and CC0 photos need no credit; the rest are credited here.</p>${FOOD_CREDITS.filter(c => !/^(CC0|Public domain|No restrictions)/i.test(c[3])).map(c => `<div>${esc(food(c[0]) ? food(c[0]).n : c[0])}: <a href="${esc(c[4])}" target="_blank" rel="noopener">${esc(c[1])}</a>${c[2] ? " by " + esc(c[2]) : ""} (${esc(c[3])})</div>`).join("")}</details>
     <button class="btn danger block" style="margin-top:12px" data-act="resetall">Erase all data</button>`;
   openSheet("Settings", b, `<button class="btn sec" data-act="close">Cancel</button><button class="btn" data-act="savesettings">Save</button>`);
 }
