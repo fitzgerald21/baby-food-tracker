@@ -49,10 +49,10 @@ export const LBCloud = {
     const p = babyPath(babyId);
     const rows = snap => snap.docs.map(d => ({ ...d.data(), id: d.id }));
     return [
-      onSnapshot(doc(db, ...p), s => h.baby(s.exists() ? s.data() : null, s.metadata.fromCache)),
-      onSnapshot(collection(db, ...p, "logs"), s => h.logs(rows(s), s.metadata.fromCache)),
-      onSnapshot(collection(db, ...p, "customFoods"), s => h.customs(rows(s), s.metadata.fromCache)),
-      onSnapshot(collection(db, ...p, "foodPhotos"), s => h.photos(rows(s), s.metadata.fromCache))
+      onSnapshot(doc(db, ...p), s => h.baby(s.exists() ? s.data() : null, s.metadata.fromCache), h.error),
+      onSnapshot(collection(db, ...p, "logs"), s => h.logs(rows(s), s.metadata.fromCache), h.error),
+      onSnapshot(collection(db, ...p, "customFoods"), s => h.customs(rows(s), s.metadata.fromCache), h.error),
+      onSnapshot(collection(db, ...p, "foodPhotos"), s => h.photos(rows(s), s.metadata.fromCache), h.error)
     ];
   },
   set: (col, babyId, id, data) => setDoc(doc(db, ...babyPath(babyId), col, id), data),

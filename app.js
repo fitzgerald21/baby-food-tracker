@@ -698,7 +698,13 @@ function saveSettings() {
   save(); closeSheet(); render(true); toast("Settings saved");
 }
 function openWelcome() {
-  const b = `<p style="margin-top:0">Track every first food, spot allergen gaps, and get age-based prep and safety tips. Your data stays on this device; you can back it up to your Google account later in Settings.</p>
+  const b = `<p style="margin-top:0">Track every first food, spot allergen gaps, and get age-based prep and safety tips.</p>
+    <p>Sign in with Google to back up your data and use it on your other devices. If you already use Little Bites on another device, signing in brings your baby and logs here.</p>
+    <div id="wl-signin"></div>`;
+  openSheet("Welcome to Little Bites 🥄", b, `<button class="btn sec" data-act="welcomesetup">Skip and set up</button><button class="btn" data-act="cloudsignin">Sign in with Google</button>`);
+}
+function openWelcomeSetup() {
+  const b = `<p style="margin-top:0">Your data stays on this device unless you sign in to back it up (Settings → Account &amp; sync).</p>
     <label class="f">Baby’s name</label><input type="text" id="wl-name" placeholder="Name (optional)" autocapitalize="words">
     <label class="f">Birthday</label><input type="date" id="wl-bday" max="${today()}"><p class="small muted">We use this to work out age and highlight the right textures for each stage.</p>
     <div class="callout warn">This app offers general guidance, not medical advice. Talk with your pediatrician before starting solids, especially about allergen introduction.</div>`;
@@ -836,6 +842,7 @@ document.addEventListener("click", e => {
     case "doPaste": importText($("#paste-box").value); break;
     case "resetall": if (confirm(`Erase ALL data on this device? This cannot be undone.${Sync.signedIn() ? " Your cloud backup stays in your account." : ""}`) && confirm("Really erase everything? Export a backup first if unsure.")) { Sync.forget(); S = defaults(); save(); PhotoStore.clear(); closeSheet(); render(); openWelcome(); } break;
     case "cloudsignin": Sync.signIn(); break;
+    case "welcomesetup": openWelcomeSetup(); break;
     case "cloudsignout": Sync.signOut(); break;
     case "welcomesave": S.baby.name = $("#wl-name").value.trim(); S.baby.bday = $("#wl-bday").value; S.settings.onboarded = true; save(); closeSheet(); render(true); break;
     case "welcomeskip": S.settings.onboarded = true; save(); closeSheet(); render(true); break;
@@ -878,5 +885,6 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && !s
 /* ───────── boot ───────── */
 route();
 Sync.boot();
-if (!S.settings.onboarded && !S.baby.bday) openWelcome();
+// Ask to sign in (or skip) on a device that has no baby yet, once we know whether it's already signed in
+Sync.ready.then(() => { if (!Sync.signedIn() && !S.settings.onboarded && !S.baby.bday && !sheetOpen()) openWelcome(); });
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => { });

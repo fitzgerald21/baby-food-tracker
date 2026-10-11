@@ -14,6 +14,8 @@ const Sync = (() => {
   let base = null;                    // what the cloud is known to hold: { uid, babyId, logs, customs, photos, photosUp, baby }
   let unsubs = [], seen = new Set(), timer = 0, status = "";
   const inflight = new Set();
+  let resolveReady;
+  const ready = new Promise(r => { resolveReady = r; });   // settles once we know whether someone is signed in (or can't find out)
 
   const readBase = () => { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { return null; } };
   const persist = () => { if (base) try { localStorage.setItem(KEY, JSON.stringify(base)); } catch (e) { } };
@@ -103,8 +105,6 @@ const Sync = (() => {
     if (!fromCache) seen.add(name);
     if (merge()) {
       save();
-      // A new device opens the welcome sheet before the cloud answers; once the saved baby arrives, drop it
-      if (name === "baby" && document.getElementById("wl-name") && (S.settings.onboarded || S.baby.bday)) closeSheet();
       if (name === "baby" && document.getElementById("st-name")) openSettings(); else refresh();
     }
     if (seen.size === LISTENERS) changed();
@@ -142,6 +142,7 @@ const Sync = (() => {
     }
     persist();
     if (jobs.length) Promise.all(jobs).then(res => show(res.every(Boolean) ? "saved " + clock() : "some changes will sync when you’re online"));
+    else show("up to date " + clock());
   }
   function changed() {
     if (!active) return;
@@ -198,6 +199,8 @@ const Sync = (() => {
     catch (e) { starting = false; show("waiting for a connection to sync"); return; }
     starting = false;
     if (!account || account.uid !== u.uid) return;                 // signed out while we were loading
+    // Nothing in the cloud and nothing set up here: this is a brand-new account, so ask for the baby's details
+    if (!babies.length && !S.settings.onboarded && !S.baby.bday) openWelcomeSetup();
     // Use the baby already in the cloud, so every device writes to the same one; otherwise use this device's baby
     const babyId = babies.length ? babies[0].id : S.baby.id;
     const saved = readBase();
@@ -206,7 +209,12 @@ const Sync = (() => {
     active = true; seen = new Set();
     PhotoStore.setRemote(photoRemote);
     unsubs = C.watch(babyId, {
-      baby: (d, c) => got("baby", c, () => mergeBaby(d)),
+      error: e => show(e && e.code === "permission-denied" ? "this Google account isn’t allowed to sync" : "can’t sync (" + ((e && (e.code || e.message)) || "unknown error") + ")"),
+      baby: (d, c) => {
+        got("baby", c, () => mergeBaby(d));
+        // A new device shows the welcome sheet before the cloud answers; once the saved baby arrives, drop it
+        if (d && (document.getElementById("wl-signin") || document.getElementById("wl-name"))) closeSheet();
+      },
       logs: (l, c) => got("logs", c, () => mergeList("logs", base.logs, l, c)),
       customs: (l, c) => got("customs", c, () => mergeList("custom", base.customs, l, c)),
       photos: (l, c) => got("photos", c, () => mergePhotos(l))
@@ -224,15 +232,17 @@ const Sync = (() => {
 
   return {
     async boot() {
+      setTimeout(resolveReady, 5000);
       try { C = (await import("./cloud.js")).LBCloud; }
-      catch (e) { show(); return; }
+      catch (e) { show(); resolveReady(); return; }
       C.redirectResult();
-      C.onAuth(u => { account = u; if (u) { show(); start(u); } else { stop(); show(); } });
+      C.onAuth(u => { resolveReady(); account = u; if (u) { show(); start(u); } else { stop(); show(); } });
       window.addEventListener("online", () => { if (account && !active) start(account); });
     },
     // save() calls this after every local change
     changed,
     box: boxHtml,
+    ready,
     signedIn: () => !!account,
     async signIn() {
       if (!C) return toast("Cloud sync isn’t available right now");
