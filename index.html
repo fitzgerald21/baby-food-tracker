@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Little Bites · Baby Food Tracker</title>
+<meta name="description" content="Track your baby's first foods, allergen introductions, reactions and favourites, with age-based preparation and safety guidance.">
+<meta name="theme-color" content="#2f7a55">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Little Bites">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo" aria-hidden="true">🥄</span><span>Little Bites</span></div>
+  <span class="spacer"></span>
+  <button class="btn sm logbtn-top" data-act="log">＋ Log a food</button>
+  <button class="iconbtn" data-act="settings" aria-label="Settings">⚙️</button>
+</header>
+
+<main id="view" aria-live="polite"></main>
+
+<button class="fab" data-act="log" aria-label="Log a food">＋ Log food</button>
+
+<nav class="tabbar" aria-label="Main">
+  <button data-tab="home"><span class="ti">🏠</span><span>Home</span></button>
+  <button data-tab="foods"><span class="ti">🥕</span><span>Foods</span></button>
+  <button data-tab="calendar"><span class="ti">📅</span><span>Calendar</span></button>
+  <button data-tab="allergens"><span class="ti">🥜</span><span>Allergens</span></button>
+  <button data-tab="guide"><span class="ti">📖</span><span>Guide</span></button>
+</nav>
+
+<div id="overlay-root"></div>
+<noscript><p style="padding:24px">Little Bites needs JavaScript to run.</p></noscript>
+<script src="data/foods.js"></script>
+<script src="data/guide.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
