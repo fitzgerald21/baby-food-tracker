@@ -4,6 +4,9 @@
    Layout: see cloud.js and FIREBASE.md. */
 const Sync = (() => {
   const KEY = "littlebites.sync";
+  // Photo backup stops at this many photos so Storage can't outgrow its free allowance (5 GB). The app uploads
+  // ~0.3 MB per photo (1 MB at most, enforced by storage.rules), so 4000 photos is about 1.2 GB. Photos stay on the device.
+  const MAX_PHOTOS = 4000;
   const LISTENERS = 4;                // baby, logs, customFoods, foodPhotos: each must answer from the server before we push
   let C = null;                       // cloud.js (LBCloud), loaded by boot(); null if it can't load (e.g. offline on first open)
   let account = null;                 // signed-in Firebase user
@@ -26,7 +29,9 @@ const Sync = (() => {
     if (!C) return `<p class="small muted">Cloud sync can’t connect right now. Reopen Little Bites when you’re online to sign in.</p>`;
     if (!account) return `<p class="small muted">Sign in with Google to back up your data and use it on other devices. Your data stays on this device too.</p>
       <button class="btn sm" data-act="cloudsignin">Sign in with Google</button>`;
+    const n = base ? Object.keys(base.photosUp).length : 0;
     return `<p class="small muted">Signed in as <b>${esc(account.email || "your Google account")}</b>${status ? " · " + esc(status) : ""}.</p>
+      ${n ? `<p class="small muted">${n} of ${MAX_PHOTOS} photos backed up.</p>` : ""}
       <button class="btn sm sec" data-act="cloudsignout">Sign out</button>`;
   }
   function show(msg) {
@@ -98,6 +103,8 @@ const Sync = (() => {
     if (!fromCache) seen.add(name);
     if (merge()) {
       save();
+      // A new device opens the welcome sheet before the cloud answers; once the saved baby arrives, drop it
+      if (name === "baby" && document.getElementById("wl-name") && (S.settings.onboarded || S.baby.bday)) closeSheet();
       if (name === "baby" && document.getElementById("st-name")) openSettings(); else refresh();
     }
     if (seen.size === LISTENERS) changed();
@@ -147,16 +154,18 @@ const Sync = (() => {
     if (!active) return;
     const want = new Set();
     S.logs.forEach(l => (l.ph || []).forEach(p => want.add(p)));
+    let backedUp = [...want].filter(p => base.photosUp[p]).length;
     for (const pid of want) {
       if (!active) return;
       if (base.photosUp[pid] || inflight.has(pid)) continue;
+      if (backedUp >= MAX_PHOTOS) { show(`photo backup paused at ${MAX_PHOTOS} photos`); return; }
       inflight.add(pid);
       try {
         const row = await PhotoStore.get(pid);
         if (!active) return;
         if (row && !base.photosUp[pid]) {
           await C.uploadPhoto(base.babyId, pid, row.blob, row.thumb);
-          base.photosUp[pid] = true; persist();
+          base.photosUp[pid] = true; persist(); backedUp++;
         }
       } catch (e) { show("some photos will upload when you’re online"); }
       finally { inflight.delete(pid); }

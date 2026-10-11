@@ -9,7 +9,10 @@ Little Bites works fully on the device by default. Signing in with Google (Setti
 
 ## Project setup
 - Little Bites lives in the same Firebase project as the Come back app: **`come-back-fitz21`**. It has its own web app registration ("Little Bites"), so each app has its own config.
-- **Firestore has one ruleset per database, shared by every app in the project.** `firestore.rules` keeps the Come back rules exactly as they were and adds the Little Bites rule. Keep both blocks when you edit it.
+- **Firestore and Storage each have one ruleset per project, shared by every app in it.** `firestore.rules` and `storage.rules` are kept **identical** in the Little Bites and Come back repos, so deploying from either is safe. If you edit one, copy it to the other. The Come back block of `firestore.rules` is unchanged.
+- **Only fitzgeraldryan21@gmail.com can use Little Bites data** (`users/{uid}/babies/...` and Storage). To add someone, edit the email check in both rules files (`isOwner` in `storage.rules`) and redeploy.
+- **Cost guards:** photos are capped at 1 MB each by `storage.rules`, and the app stops backing up at 4000 photos (`MAX_PHOTOS` in `sync.js`, about 1.2 GB against the 5 GB free allowance). Google has no hard spending cap, so also keep a budget alert on the billing account (Cloud Console → Billing → Budgets & alerts).
+- The Storage bucket is in US-EAST1, one of the regions with a free tier.
 - Storage needs the Blaze (pay-as-you-go) plan.
 - Authorized domains (Authentication → Settings) must include `fitzgerald21.github.io`. Come back already uses it.
 - Deploy rules with: `firebase deploy --only firestore:rules,storage --project come-back-fitz21`
@@ -37,7 +40,7 @@ Little Bites works fully on the device by default. Signing in with Google (Setti
 Code: `app.js` (state and UI), `store.js` (`PhotoStore`), `sync.js` (merge and push), `cloud.js` (the Firebase wrapper, loaded on demand), `firebase-config.js`, `firestore.rules`, `storage.rules`.
 
 ## Security
-Each signed-in user can read and write only their own `users/{uid}/...` tree, in both Firestore and Storage. Photo uploads are capped at 5 MB.
+Only the allowed account can read and write its own `users/{uid}/...` tree, in both Firestore and Storage. Photo uploads are capped at 1 MB and must be JPEG.
 
 The web config in `firebase-config.js` is not a secret. Access is controlled by the rules and by the authorized domains list.
 
