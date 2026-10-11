@@ -315,7 +315,7 @@ function logRow(l) {
   const meal = MEALS.find(m => m.v === l.m);
   const sev = Math.max(0, ...(l.x || []).map(x => (REACT_BY_ID[x] || {}).sev || 0));
   return `<div class="li click" data-act="editlog" data-id="${l.id}">${fimg(f, "sm")}<div class="grow"><div class="t">${esc(f.n)} ${ratingEmoji(l.r)}</div>
-    <div class="s">${l.d ? fmtDate(l.d, { weekday: "short", month: "short", day: "numeric" }) : "Earlier (no date)"}${meal ? " · " + meal.l : ""}${l.p ? " · " + esc(l.p) : ""}${rx.length ? ` · <span style="color:${sev >= 2 ? "var(--danger)" : "var(--warn)"}">${esc(rx.join(", "))}</span>` : ""}</div></div>${(l.ph || []).slice(0, 1).map(pid => `<span class="phmini"><img data-pid="${pid}" alt="">${l.ph.length > 1 ? `<i>+${l.ph.length - 1}</i>` : ""}</span>`).join("")}<span class="muted">›</span></div>`;
+    <div class="s">${l.d ? fmtDate(l.d, { weekday: "short", month: "short", day: "numeric" }) : "Earlier (no date)"}${meal ? " · " + meal.l : ""}${l.p ? " · " + esc(l.p) : ""}${rx.length ? ` · <span style="color:${sev >= 2 ? "var(--danger)" : "var(--warn)"}">${esc(rx.join(", "))}</span>` : ""}</div></div>${(l.ph || []).slice(0, 1).map(pid => `<button class="phmini" data-act="photo" data-id="${pid}" data-log="${l.id}" aria-label="View photo${l.ph.length > 1 ? "s" : ""}"><img data-pid="${pid}" alt="">${l.ph.length > 1 ? `<i>+${l.ph.length - 1}</i>` : ""}</button>`).join("")}<span class="muted">›</span></div>`;
 }
 
 /* ───────── FOODS ───────── */
