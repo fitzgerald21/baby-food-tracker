@@ -32,7 +32,7 @@ const Sync = (() => {
     if (!account) return `<p class="small muted">Sign in with Google to back up your data and use it on other devices. Your data stays on this device too.</p>
       <button class="btn sm" data-act="cloudsignin">Sign in with Google</button>`;
     const n = base ? Object.keys(base.photosUp).length : 0;
-    return `<p class="small muted">Signed in as <b>${esc(account.email || "your Google account")}</b>${status ? " · " + esc(status) : ""}.</p>
+    return `<p class="small muted">Signed in as <b>${esc(account.email || "your Google account")}</b>${status ? " · " + esc(status) : ""}${active && seen.size < LISTENERS && /^syncing/.test(status) ? ` (${seen.size} of ${LISTENERS} answered)` : ""}.</p>
       ${n ? `<p class="small muted">${n} of ${MAX_PHOTOS} photos backed up.</p>` : ""}
       <button class="btn sm sec" data-act="cloudsignout">Sign out</button>`;
   }
@@ -102,7 +102,7 @@ const Sync = (() => {
   // A listener answered. Merge what it sent, redraw, and once every listener has heard from the server, push our changes.
   function got(name, fromCache, merge) {
     if (!active) return;
-    if (!fromCache) seen.add(name);
+    if (!fromCache && !seen.has(name)) { seen.add(name); show(); }
     if (merge()) {
       save();
       if (name === "baby" && document.getElementById("st-name")) openSettings(); else refresh();

@@ -16,7 +16,8 @@ import { FIREBASE_CONFIG } from "./firebase-config.js";
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 // Persistent cache keeps the app usable offline; writes made offline are sent when the connection returns.
-const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+// Auto long-polling: some networks, VPNs and browser extensions block Firestore's streaming connection, which otherwise leaves sync waiting forever.
+const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }), experimentalAutoDetectLongPolling: true });
 const files = getStorage(app);
 
 const me = () => auth.currentUser.uid;
@@ -48,11 +49,13 @@ export const LBCloud = {
   watch(babyId, h) {
     const p = babyPath(babyId);
     const rows = snap => snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    // includeMetadataChanges: without it a listener whose cached data matches the server's never fires again, so we'd never learn the server had answered.
+    const o = { includeMetadataChanges: true };
     return [
-      onSnapshot(doc(db, ...p), s => h.baby(s.exists() ? s.data() : null, s.metadata.fromCache), h.error),
-      onSnapshot(collection(db, ...p, "logs"), s => h.logs(rows(s), s.metadata.fromCache), h.error),
-      onSnapshot(collection(db, ...p, "customFoods"), s => h.customs(rows(s), s.metadata.fromCache), h.error),
-      onSnapshot(collection(db, ...p, "foodPhotos"), s => h.photos(rows(s), s.metadata.fromCache), h.error)
+      onSnapshot(doc(db, ...p), o, s => h.baby(s.exists() ? s.data() : null, s.metadata.fromCache), h.error),
+      onSnapshot(collection(db, ...p, "logs"), o, s => h.logs(rows(s), s.metadata.fromCache), h.error),
+      onSnapshot(collection(db, ...p, "customFoods"), o, s => h.customs(rows(s), s.metadata.fromCache), h.error),
+      onSnapshot(collection(db, ...p, "foodPhotos"), o, s => h.photos(rows(s), s.metadata.fromCache), h.error)
     ];
   },
   set: (col, babyId, id, data) => setDoc(doc(db, ...babyPath(babyId), col, id), data),
