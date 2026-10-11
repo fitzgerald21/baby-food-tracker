@@ -31,7 +31,7 @@ const EMOJI_PICKS = ["🍎", "🍌", "🥭", "🍓", "🥕", "🌽", "🥦", "�
 
 /* ───────── state ───────── */
 function defaults() {
-  return { v: 1, baby: { name: "", bday: "" }, logs: [], custom: [], photos: {}, settings: { target: 2, theme: "auto", onboarded: false, lastExport: "", tipUntil: "" } };
+  return { v: 1, baby: { id: "b_" + Date.now().toString(36), name: "", bday: "" }, logs: [], custom: [], photos: {}, settings: { target: 2, theme: "auto", onboarded: false, lastExport: "", tipUntil: "" } };
 }
 let S = load();
 function load() {
@@ -195,6 +195,7 @@ function openSheet(title, body, foot, o) {
     <div class="body" id="sheet-body">${body}</div>${foot ? `<div class="foot">${foot}</div>` : ""}</div></div>`;
   document.body.classList.add("lock");
   if (keep) $("#sheet-body").scrollTop = keep;
+  hydratePhotos();
 }
 function closeSheet() { root().innerHTML = ""; document.body.classList.remove("lock"); }
 function dismiss() { closeSheet(); draft = null; cu = null; cf = null; }
@@ -214,6 +215,7 @@ function render(keepScroll) {
   v.innerHTML = fn(idx);
   if (!keepScroll) window.scrollTo(0, 0);
   applyTheme();
+  hydratePhotos();
 }
 function applyTheme() {
   const t = S.settings.theme;
@@ -288,6 +290,9 @@ function viewHome(idx) {
   if (retry.length) h += `<div class="sectionhead"><h2>Not a fan yet — try again</h2></div><div class="chips">${retry.map(x => `<button class="chip" data-act="food" data-id="${x.f.id}">${fimg(x.f, "xs")} ${esc(x.f.n)} · ${x.s.tries}×</button>`).join("")}</div>
     <p class="small muted">Babies often need <b>8–15 exposures</b> before accepting a new food. Try different preparations and keep it low-pressure.</p>`;
 
+  /* moments (photos) */
+  const moments = S.logs.filter(l => (l.ph || []).length && food(l.f)).sort((a, b) => (b.d || "").localeCompare(a.d || "") || (b.t || 0) - (a.t || 0)).slice(0, 12);
+  if (moments.length) h += `<div class="sectionhead"><h2>📷 Moments</h2></div><div class="hscroll">${moments.map(l => `<button class="moment" data-act="photo" data-id="${l.ph[0]}" data-log="${l.id}"><img data-pid="${l.ph[0]}" data-kind="thumb" alt="${esc(food(l.f).n)}"><span>${esc(food(l.f).n)}${l.d ? " · " + fmtDate(l.d) : ""}</span></button>`).join("")}</div>`;
   /* recent */
   const recent = S.logs.filter(l => food(l.f)).slice().sort((a, b) => (b.d || "").localeCompare(a.d || "") || (b.t || 0) - (a.t || 0)).slice(0, 8);
   h += `<div class="sectionhead"><h2>Recent</h2><a href="#/calendar">Calendar ›</a></div>`;
@@ -309,7 +314,7 @@ function logRow(l) {
   const meal = MEALS.find(m => m.v === l.m);
   const sev = Math.max(0, ...(l.x || []).map(x => (REACT_BY_ID[x] || {}).sev || 0));
   return `<div class="li click" data-act="editlog" data-id="${l.id}">${fimg(f, "sm")}<div class="grow"><div class="t">${esc(f.n)} ${ratingEmoji(l.r)}</div>
-    <div class="s">${l.d ? fmtDate(l.d, { weekday: "short", month: "short", day: "numeric" }) : "Earlier (no date)"}${meal ? " · " + meal.l : ""}${l.p ? " · " + esc(l.p) : ""}${rx.length ? ` · <span style="color:${sev >= 2 ? "var(--danger)" : "var(--warn)"}">${esc(rx.join(", "))}</span>` : ""}</div></div><span class="muted">›</span></div>`;
+    <div class="s">${l.d ? fmtDate(l.d, { weekday: "short", month: "short", day: "numeric" }) : "Earlier (no date)"}${meal ? " · " + meal.l : ""}${l.p ? " · " + esc(l.p) : ""}${rx.length ? ` · <span style="color:${sev >= 2 ? "var(--danger)" : "var(--warn)"}">${esc(rx.join(", "))}</span>` : ""}</div></div>${(l.ph || []).slice(0, 1).map(pid => `<span class="phmini"><img data-pid="${pid}" alt="">${l.ph.length > 1 ? `<i>+${l.ph.length - 1}</i>` : ""}</span>`).join("")}<span class="muted">›</span></div>`;
 }
 
 /* ───────── FOODS ───────── */
@@ -402,9 +407,9 @@ function openLog(o) {
   o = o || {};
   if (o.editId) {
     const l = S.logs.find(x => x.id === o.editId); if (!l) return;
-    draft = { editId: l.id, foods: [l.f], d: l.d, undated: !l.d, m: l.m || "", r: l.r || 0, x: (l.x || []).slice(), p: l.p || "", n: l.n || "", q: "", cat: "all" };
+    draft = { editId: l.id, ph: (l.ph || []).slice(), add: [], foods: [l.f], d: l.d, undated: !l.d, m: l.m || "", r: l.r || 0, x: (l.x || []).slice(), p: l.p || "", n: l.n || "", q: "", cat: "all" };
   } else {
-    draft = { editId: "", foods: o.foods || [], d: o.date || today(), undated: false, m: "", r: 0, x: [], p: "", n: "", q: "", cat: "all" };
+    draft = { editId: "", ph: [], add: [], foods: o.foods || [], d: o.date || today(), undated: false, m: "", r: 0, x: [], p: "", n: "", q: "", cat: "all" };
   }
   renderLog();
 }
@@ -427,6 +432,9 @@ function renderLog(keep) {
     ${d.x.some(x => (REACT_BY_ID[x] || {}).sev === 3) ? `<div class="callout danger"><b>Emergency signs:</b> swelling, trouble breathing or a limp/pale baby need <b>911 / emergency care now</b>. Don’t wait for the app.</div>` : d.x.some(x => (REACT_BY_ID[x] || {}).sev === 2) ? `<div class="callout warn"><b>Call your pediatrician</b> about hives or vomiting after a new food, and don’t offer it again until they advise.</div>` : ""}
     <label class="f">How was it served?</label>
     <select id="lg-p"><option value="">—</option>${PREPS.map(p => `<option ${d.p === p ? "selected" : ""}>${p}</option>`).join("")}</select>
+    <label class="f">Photos</label>
+    <div class="chips" id="lg-ph">${d.ph.map(id => `<span class="phthumb"><img data-pid="${id}" alt="Photo"><button data-act="lgphrm" data-id="${id}" aria-label="Remove photo">✕</button></span>`).join("")}${d.add.map(p => `<span class="phthumb"><img src="${p.url}" alt="New photo"><button data-act="lgphrm" data-id="${p.id}" aria-label="Remove photo">✕</button></span>`).join("")}</div>
+    <div class="row wrap" style="margin-top:8px"><label class="btn sm sec" style="cursor:pointer">📷 Take photo<input type="file" accept="image/*" capture="environment" id="ph-cam" hidden></label><label class="btn sm sec" style="cursor:pointer">🖼 Choose photo<input type="file" accept="image/*" multiple id="ph-lib" hidden></label></div>
     <label class="f">Notes</label><textarea id="lg-n" placeholder="Paired with…, how much they ate, anything to remember">${esc(d.n)}</textarea>`;
   if (edit) b += `<button class="btn danger block" style="margin-top:14px" data-act="deletelog">🗑 Delete this entry</button>`;
   openSheet(edit ? "Edit entry" : "Log a food", b, `<button class="btn sec" data-act="close">Cancel</button><button class="btn" data-act="savelog">${edit ? "Save changes" : `Save${sel.length > 1 ? " " + sel.length + " foods" : ""}`}</button>`, { keepScroll: keep });
@@ -466,14 +474,17 @@ function saveLog() {
   }
   const date = d.undated ? "" : (d.d || today());
   const x = d.x.filter(v => v !== "none" || d.x.length === 1);
+  const ph = d.ph.concat(d.add.map(p => p.id));
+  d.add.forEach(p => { PhotoStore.put(p.id, p.rec); });
   if (d.editId) {
     const l = S.logs.find(l => l.id === d.editId);
-    Object.assign(l, { f: d.foods[0], d: date, m: d.m, r: d.r, x, p: d.p, n: d.n.trim() });
+    Object.assign(l, { f: d.foods[0], d: date, m: d.m, r: d.r, x, p: d.p, n: d.n.trim(), ph, u: Date.now() });
   } else {
-    d.foods.forEach(fid => S.logs.push({ id: uid(), f: fid, d: date, m: d.m, r: d.r, x, p: d.p, n: d.n.trim(), t: Date.now() }));
+    d.foods.forEach(fid => S.logs.push({ id: uid(), f: fid, d: date, m: d.m, r: d.r, x, p: d.p, n: d.n.trim(), ph: ph.slice(), t: Date.now(), u: Date.now() }));
   }
+  setTimeout(gcPhotos, 400);
   const severe = x.some(v => (REACT_BY_ID[v] || {}).sev === 3), moderate = x.some(v => (REACT_BY_ID[v] || {}).sev === 2);
-  save(); closeSheet(); draft = null; render(true);
+  save(); closeSheet(); draft.add.forEach(p => URL.revokeObjectURL(p.url)); draft = null; render(true);
   if (severe) openSheet("Seek emergency care", `<div class="callout danger"><b>You logged signs of a serious reaction.</b><br>Swelling of the face/lips/tongue, trouble breathing, or a pale/limp baby can be anaphylaxis. <b>Call 911 (or your local emergency number) now.</b> If your doctor prescribed epinephrine, use it as instructed.</div>`, `<button class="btn" data-act="close">OK</button>`);
   else if (moderate) toast("Saved — please call your pediatrician about this reaction");
   else toast(d.editId ? "Entry updated" : "Logged ✓");
@@ -669,7 +680,7 @@ function openSettings() {
     <label class="f">Appearance</label><select id="st-theme">${[["auto", "Match device"], ["light", "Light"], ["dark", "Dark"]].map(([v, l]) => `<option value="${v}" ${s.theme === v ? "selected" : ""}>${l}</option>`).join("")}</select>
     <div class="sectionhead"><h2>Your data</h2></div>
     <div class="callout">Everything is stored privately on <b>this device and browser</b> (not uploaded anywhere). To use another device, export a backup here and import it there. <b>iPhone tip:</b> tap Share → <b>Add to Home Screen</b> for an app-like experience and more reliable storage.</div>
-    <div class="row wrap" style="margin-top:12px"><button class="btn sm sec" data-act="exportjson">⬇ Export backup</button><button class="btn sm sec" data-act="copyjson">📋 Copy backup</button><button class="btn sm sec" data-act="exportcsv">📄 Export CSV</button>
+    <div class="row wrap" style="margin-top:12px"><button class="btn sm sec" data-act="exportjson">⬇ Export backup</button><button class="btn sm sec" data-act="exportfull">🖼 Backup with photos</button><button class="btn sm sec" data-act="copyjson">📋 Copy backup</button><button class="btn sm sec" data-act="exportcsv">📄 Export CSV</button>
       <a class="btn sm sec" href="#/report" data-act="close">🩺 Pediatrician report</a></div>
     <label class="f">Restore from backup</label>
     <div class="row wrap"><label class="btn sm sec" style="cursor:pointer">📂 Choose file<input type="file" id="importfile" accept=".json,application/json" hidden></label><button class="btn sm sec" data-act="pasteimport">Paste backup text</button></div>
@@ -702,7 +713,32 @@ function importText(txt) {
   if (!d || !Array.isArray(d.logs)) { toast("Backup not recognised"); return; }
   if (!confirm(`Replace the data on this device with the backup (${d.logs.length} entries)?`)) return;
   S = { ...defaults(), ...d, baby: { ...defaults().baby, ...(d.baby || {}) }, settings: { ...defaults().settings, ...(d.settings || {}) }, custom: d.custom || [], photos: d.photos || {} };
-  save(); closeSheet(); render(true); toast("Backup restored ✓");
+  save(); closeSheet();
+  PhotoStore.importAll(p.logPhotos).then(() => { render(true); toast("Backup restored ✓"); }, () => { render(true); toast("Restored, but some photos failed"); });
+}
+async function exportFull() {
+  const keep = new Set(); S.logs.forEach(l => (l.ph || []).forEach(p => keep.add(p)));
+  const photos = await PhotoStore.exportAll([...keep]);
+  download(`little-bites-backup-with-photos-${today()}.json`, JSON.stringify({ app: "littlebites", exported: new Date().toISOString(), data: S, logPhotos: photos }), "application/json");
+  markExported(); toast("Backup with photos downloaded");
+}
+async function gcPhotos() {
+  const used = new Set(); S.logs.forEach(l => (l.ph || []).forEach(p => used.add(p)));
+  for (const id of await PhotoStore.ids()) if (!used.has(id)) await PhotoStore.remove(id);
+  render(true);
+}
+const phLoading = new Set();
+function hydratePhotos() {
+  document.querySelectorAll("img[data-pid]:not([src])").forEach(img => {
+    PhotoStore.url(img.dataset.pid, img.dataset.kind || "thumb").then(u => { if (u) img.src = u; else img.replaceWith(Object.assign(document.createElement("span"), { textContent: "📷" })); });
+  });
+}
+function openPhoto(pid, logId) {
+  const l = S.logs.find(x => x.id === logId), f = l && food(l.f);
+  openSheet(f ? f.n : "Photo", `<img data-pid="${pid}" data-kind="full" alt="" style="width:100%;border-radius:16px;display:block">
+    ${l ? `<p class="muted" style="margin:10px 0 0">${l.d ? fmtDate(l.d, { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Earlier"}${l.n ? " · " + esc(l.n) : ""}</p>` : ""}
+    ${l && l.ph.length > 1 ? `<div class="chips" style="margin-top:10px">${l.ph.map(p => `<button class="phthumb" data-act="photo" data-id="${p}" data-log="${l.id}"><img data-pid="${p}" alt=""></button>`).join("")}</div>` : ""}`,
+    l ? `<button class="btn danger" data-act="rmphotolog" data-id="${pid}" data-log="${l.id}">Remove photo</button><button class="btn" data-act="editlog" data-id="${l.id}">Open entry</button>` : "");
 }
 function exportCsv() {
   const q = v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
@@ -735,6 +771,9 @@ document.addEventListener("click", e => {
     case "settings": openSettings(); break;
     case "food": openFood(id); break;
     case "editlog": openLog({ editId: id }); break;
+    case "photo": openPhoto(id, el.dataset.log); break;
+    case "lgphrm": collectLog(); { const a = draft.add.findIndex(p => p.id === id); if (a >= 0) { URL.revokeObjectURL(draft.add[a].url); draft.add.splice(a, 1); } else draft.ph = draft.ph.filter(x => x !== id); } renderLog(true); break;
+    case "rmphotolog": { const l = S.logs.find(x => x.id === el.dataset.log); if (l && confirm("Remove this photo?")) { l.ph = (l.ph || []).filter(x => x !== id); l.u = Date.now(); save(); closeSheet(); render(true); gcPhotos(); } break; }
     case "stagetab": openFood(id, v); break;
     case "goRoadmap": ui.guideOpen = "roadmap"; if (ui.tab === "guide") render(); break;
     case "goGuideAllergy": ui.guideOpen = "allergy"; if (ui.tab === "guide") { render(); } break;
@@ -745,7 +784,7 @@ document.addEventListener("click", e => {
     case "editcustom": openCustom(id); break;
     case "cfemoji": cf.e = v; $("#cf-e").value = v; document.querySelectorAll('[data-act="cfemoji"]').forEach(b => b.classList.toggle("on", b.dataset.v === v)); break;
     case "savecustom": saveCustom(); break;
-    case "delcustom": if (confirm("Delete this food and all of its logged entries?")) { S.logs = S.logs.filter(l => l.f !== id); S.custom = S.custom.filter(x => x.id !== id); delete S.photos[id]; save(); closeSheet(); render(true); } break;
+    case "delcustom": if (confirm("Delete this food and all of its logged entries?")) { S.logs = S.logs.filter(l => l.f !== id); S.custom = S.custom.filter(x => x.id !== id); delete S.photos[id]; save(); closeSheet(); render(true); gcPhotos(); } break;
     case "rmphoto": delete S.photos[id]; save(); openFood(id); render(true); break;
     /* log sheet */
     case "lgpick": { const i = draft.foods.indexOf(id); if (i >= 0) draft.foods.splice(i, 1); else draft.foods.push(id); refreshPicker(); break; }
@@ -754,7 +793,7 @@ document.addEventListener("click", e => {
     case "lgmeal": draft.m = draft.m === v ? "" : v; collectLog(); renderLog(true); break;
     case "lgrate": draft.r = draft.r === +v ? 0 : +v; collectLog(); renderLog(true); break;
     case "savelog": collectLog(); saveLog(); break;
-    case "deletelog": if (confirm("Delete this entry?")) { S.logs = S.logs.filter(l => l.id !== draft.editId); save(); closeSheet(); draft = null; render(true); toast("Entry deleted"); } break;
+    case "deletelog": if (confirm("Delete this entry?")) { S.logs = S.logs.filter(l => l.id !== draft.editId); save(); closeSheet(); draft = null; render(true); gcPhotos(); toast("Entry deleted"); } break;
     /* catch-up */
     case "cupick": if (cu.sel[id]) delete cu.sel[id]; else cu.sel[id] = { n: 1, r: 0 }; cuRefresh(); break;
     case "cucat": cu.cat = v; cuRefresh(); break;
@@ -765,7 +804,7 @@ document.addEventListener("click", e => {
     case "curate": cu.sel[id].r = cu.sel[id].r === +v ? 0 : +v; cu.d = $("#cu-d").value; renderCatchup(); break;
     case "cusave": {
       const date = $("#cu-d").value; let n = 0;
-      Object.entries(cu.sel).forEach(([fid, e]) => { for (let i = 0; i < e.n; i++) { S.logs.push({ id: uid(), f: fid, d: date, m: "", r: e.r, x: [], p: "", n: "", t: Date.now() + n }); n++; } });
+      Object.entries(cu.sel).forEach(([fid, e]) => { for (let i = 0; i < e.n; i++) { S.logs.push({ id: uid(), f: fid, d: date, m: "", r: e.r, x: [], p: "", n: "", ph: [], t: Date.now() + n, u: Date.now() }); n++; } });
       save(); closeSheet(); const k = Object.keys(cu.sel).length; cu = null; render(true); toast(`Added ${k} food${k === 1 ? "" : "s"} ✓`); break;
     }
     /* calendar */
@@ -785,12 +824,13 @@ document.addEventListener("click", e => {
     case "exportjson": download(`little-bites-backup-${today()}.json`, backupText(), "application/json"); markExported(); toast("Backup downloaded"); break;
     case "copyjson": (navigator.clipboard ? navigator.clipboard.writeText(backupText()) : Promise.reject()).then(() => { markExported(); toast("Backup copied — paste it somewhere safe"); }, () => toast("Couldn't copy; use Export instead")); break;
     case "exportcsv": exportCsv(); break;
+    case "exportfull": toast("Preparing backup with photos…"); exportFull(); break;
     case "pasteimport": {
       const b = `<p class="muted" style="margin-top:0">Paste the backup text you copied from another device.</p><textarea id="paste-box" style="min-height:160px" placeholder="{ ... }"></textarea>`;
       openSheet("Restore from text", b, `<button class="btn sec" data-act="close">Cancel</button><button class="btn" data-act="doPaste">Restore</button>`); break;
     }
     case "doPaste": importText($("#paste-box").value); break;
-    case "resetall": if (confirm("Erase ALL data on this device? This cannot be undone.") && confirm("Really erase everything? Export a backup first if unsure.")) { S = defaults(); save(); closeSheet(); render(); openWelcome(); } break;
+    case "resetall": if (confirm("Erase ALL data on this device? This cannot be undone.") && confirm("Really erase everything? Export a backup first if unsure.")) { S = defaults(); save(); PhotoStore.clear(); closeSheet(); render(); openWelcome(); } break;
     case "welcomesave": S.baby.name = $("#wl-name").value.trim(); S.baby.bday = $("#wl-bday").value; S.settings.onboarded = true; save(); closeSheet(); render(true); break;
     case "welcomeskip": S.settings.onboarded = true; save(); closeSheet(); render(true); break;
     case "print": window.print(); break;
@@ -817,6 +857,10 @@ document.addEventListener("change", e => {
   } else if (t.id === "photoin" && t.files[0]) {
     const fid = t.dataset.id;
     resizeImage(t.files[0], 192).then(url => { S.photos[fid] = url; if (save()) { openFood(fid); render(true); toast("Photo added"); } }, () => toast("Couldn’t read that image"));
+  } else if ((t.id === "ph-cam" || t.id === "ph-lib") && t.files.length) {
+    collectLog();
+    const files = [...t.files];
+    Promise.all(files.map(f => PhotoStore.prepare(f).then(rec => ({ id: "p_" + uid(), rec, url: URL.createObjectURL(rec.thumb) })))).then(list => { draft.add.push(...list); renderLog(true); }, () => toast("Couldn’t read that photo"));
   } else if (t.id === "importfile" && t.files[0]) {
     const rd = new FileReader(); rd.onload = () => importText(String(rd.result)); rd.readAsText(t.files[0]);
   }
