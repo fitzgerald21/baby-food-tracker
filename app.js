@@ -1,5 +1,6 @@
 "use strict";
-/* Little Bites — baby food tracker. Data lives in this browser (localStorage). No accounts, no servers. */
+/* Little Bites — baby food tracker. Data lives in this browser (localStorage). Optional Google sign-in backs it up
+   and syncs it across devices (sync.js, cloud.js). */
 
 const LS_KEY = "littlebites.v1";
 const RATINGS = [
@@ -31,7 +32,7 @@ const EMOJI_PICKS = ["🍎", "🍌", "🥭", "🍓", "🥕", "🌽", "🥦", "�
 
 /* ───────── state ───────── */
 function defaults() {
-  return { v: 1, baby: { id: "b_" + Date.now().toString(36), name: "", bday: "" }, logs: [], custom: [], photos: {}, settings: { target: 2, theme: "auto", onboarded: false, lastExport: "", tipUntil: "" } };
+  return { v: 1, baby: { id: "b_" + Date.now().toString(36), name: "", bday: "" }, logs: [], custom: [], photos: {}, photoU: {}, settings: { target: 2, theme: "auto", onboarded: false, lastExport: "", tipUntil: "" } };
 }
 let S = load();
 function load() {
@@ -39,11 +40,11 @@ function load() {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return defaults();
     const p = JSON.parse(raw), d = defaults();
-    return { ...d, ...p, baby: { ...d.baby, ...(p.baby || {}) }, settings: { ...d.settings, ...(p.settings || {}) }, logs: p.logs || [], custom: p.custom || [], photos: p.photos || {} };
+    return { ...d, ...p, baby: { ...d.baby, ...(p.baby || {}) }, settings: { ...d.settings, ...(p.settings || {}) }, logs: p.logs || [], custom: p.custom || [], photos: p.photos || {}, photoU: p.photoU || {} };
   } catch (e) { return defaults(); }
 }
 function save() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); return true; }
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); Sync.changed(); return true; }
   catch (e) { toast("Couldn't save — browser storage may be full or blocked."); return false; }
 }
 const ui = { tab: "home", foodQ: "", foodCat: "all", foodFilter: "all", calY: 0, calM: 0, calSel: "", stageTab: "", guideOpen: "" };
@@ -552,7 +553,7 @@ function saveCustom() {
   cf.n = n; cf.e = $("#cf-e").value.trim(); cf.c = $("#cf-c").value; cf.fe = $("#cf-fe").checked; cf.col = $("#cf-col").value;
   cf.a = [...document.querySelectorAll("[data-cfal]")].filter(x => x.checked).map(x => x.dataset.cfal);
   cf.prep = $("#cf-prep").value.trim(); cf.pairText = $("#cf-pair").value.trim();
-  cf.custom = true; cf.pair = []; cf.risk = ""; cf.nut = ""; cf.min = 6;
+  cf.custom = true; cf.pair = []; cf.risk = ""; cf.nut = ""; cf.min = 6; cf.u = Date.now();
   if (cf.id) { const i = S.custom.findIndex(x => x.id === cf.id); S.custom[i] = cf; }
   else { cf.id = "c_" + uid(); S.custom.push(cf); }
   save(); rebuildFoodMap(); closeSheet();
@@ -679,13 +680,15 @@ function openSettings() {
     <p class="small muted">Evidence for the ideal frequency is limited (guidance ranges from about weekly to 2–3×/week). Choose what your pediatrician recommends.</p>
     <label class="f">Appearance</label><select id="st-theme">${[["auto", "Match device"], ["light", "Light"], ["dark", "Dark"]].map(([v, l]) => `<option value="${v}" ${s.theme === v ? "selected" : ""}>${l}</option>`).join("")}</select>
     <div class="sectionhead"><h2>Your data</h2></div>
-    <div class="callout">Everything is stored privately on <b>this device and browser</b> (not uploaded anywhere). To use another device, export a backup here and import it there. <b>iPhone tip:</b> tap Share → <b>Add to Home Screen</b> for an app-like experience and more reliable storage.</div>
+    <div class="callout">Everything is stored on <b>this device and browser</b>. Sign in below to also back it up to your Google account and sync it to your other devices. You can always export a backup too. <b>iPhone tip:</b> tap Share → <b>Add to Home Screen</b> for an app-like experience and more reliable storage.</div>
+    <div class="sectionhead"><h2>Account &amp; sync</h2></div>
+    <div id="cloudBox">${Sync.box()}</div>
     <div class="row wrap" style="margin-top:12px"><button class="btn sm sec" data-act="exportjson">⬇ Export backup</button><button class="btn sm sec" data-act="exportfull">🖼 Backup with photos</button><button class="btn sm sec" data-act="copyjson">📋 Copy backup</button><button class="btn sm sec" data-act="exportcsv">📄 Export CSV</button>
       <a class="btn sm sec" href="#/report" data-act="close">🩺 Pediatrician report</a></div>
     <label class="f">Restore from backup</label>
     <div class="row wrap"><label class="btn sm sec" style="cursor:pointer">📂 Choose file<input type="file" id="importfile" accept=".json,application/json" hidden></label><button class="btn sm sec" data-act="pasteimport">Paste backup text</button></div>
     <div class="sectionhead"><h2>About</h2></div>
-    <p class="small muted">Little Bites is a free personal tracker. Food guidance is summarised from the CDC, AAP, NIAID, FDA and ASCIA (see Guide → Sources) and is not a substitute for medical advice. Photos you add are stored on this device only.</p>
+    <p class="small muted">Little Bites is a free personal tracker. Food guidance is summarised from the CDC, AAP, NIAID, FDA and ASCIA (see Guide → Sources) and is not a substitute for medical advice. Photos you add are stored on this device and, when you’re signed in, in your private account backup.</p>
     <button class="btn danger block" style="margin-top:12px" data-act="resetall">Erase all data</button>`;
   openSheet("Settings", b, `<button class="btn sec" data-act="close">Cancel</button><button class="btn" data-act="savesettings">Save</button>`);
 }
@@ -695,7 +698,7 @@ function saveSettings() {
   save(); closeSheet(); render(true); toast("Settings saved");
 }
 function openWelcome() {
-  const b = `<p style="margin-top:0">Track every first food, spot allergen gaps, and get age-based prep and safety tips. Your data stays on this device.</p>
+  const b = `<p style="margin-top:0">Track every first food, spot allergen gaps, and get age-based prep and safety tips. Your data stays on this device; you can back it up to your Google account later in Settings.</p>
     <label class="f">Baby’s name</label><input type="text" id="wl-name" placeholder="Name (optional)" autocapitalize="words">
     <label class="f">Birthday</label><input type="date" id="wl-bday" max="${today()}"><p class="small muted">We use this to work out age and highlight the right textures for each stage.</p>
     <div class="callout warn">This app offers general guidance, not medical advice. Talk with your pediatrician before starting solids, especially about allergen introduction.</div>`;
@@ -712,7 +715,8 @@ function importText(txt) {
   const d = p && p.data ? p.data : p;
   if (!d || !Array.isArray(d.logs)) { toast("Backup not recognised"); return; }
   if (!confirm(`Replace the data on this device with the backup (${d.logs.length} entries)?`)) return;
-  S = { ...defaults(), ...d, baby: { ...defaults().baby, ...(d.baby || {}) }, settings: { ...defaults().settings, ...(d.settings || {}) }, custom: d.custom || [], photos: d.photos || {} };
+  S = { ...defaults(), ...d, baby: { ...defaults().baby, ...(d.baby || {}) }, settings: { ...defaults().settings, ...(d.settings || {}) }, custom: d.custom || [], photos: d.photos || {}, photoU: d.photoU || {} };
+  Object.keys(S.photos).forEach(k => { S.photoU[k] = Date.now(); });   // restored food photos are newer than anything in the cloud
   save(); closeSheet();
   PhotoStore.importAll(p.logPhotos).then(() => { render(true); toast("Backup restored ✓"); }, () => { render(true); toast("Restored, but some photos failed"); });
 }
@@ -784,8 +788,8 @@ document.addEventListener("click", e => {
     case "editcustom": openCustom(id); break;
     case "cfemoji": cf.e = v; $("#cf-e").value = v; document.querySelectorAll('[data-act="cfemoji"]').forEach(b => b.classList.toggle("on", b.dataset.v === v)); break;
     case "savecustom": saveCustom(); break;
-    case "delcustom": if (confirm("Delete this food and all of its logged entries?")) { S.logs = S.logs.filter(l => l.f !== id); S.custom = S.custom.filter(x => x.id !== id); delete S.photos[id]; save(); closeSheet(); render(true); gcPhotos(); } break;
-    case "rmphoto": delete S.photos[id]; save(); openFood(id); render(true); break;
+    case "delcustom": if (confirm("Delete this food and all of its logged entries?")) { S.logs = S.logs.filter(l => l.f !== id); S.custom = S.custom.filter(x => x.id !== id); delete S.photos[id]; S.photoU[id] = Date.now(); save(); closeSheet(); render(true); gcPhotos(); } break;
+    case "rmphoto": delete S.photos[id]; S.photoU[id] = Date.now(); save(); openFood(id); render(true); break;
     /* log sheet */
     case "lgpick": { const i = draft.foods.indexOf(id); if (i >= 0) draft.foods.splice(i, 1); else draft.foods.push(id); refreshPicker(); break; }
     case "lgrm": draft.foods = draft.foods.filter(x => x !== id); refreshPicker(); break;
@@ -830,7 +834,9 @@ document.addEventListener("click", e => {
       openSheet("Restore from text", b, `<button class="btn sec" data-act="close">Cancel</button><button class="btn" data-act="doPaste">Restore</button>`); break;
     }
     case "doPaste": importText($("#paste-box").value); break;
-    case "resetall": if (confirm("Erase ALL data on this device? This cannot be undone.") && confirm("Really erase everything? Export a backup first if unsure.")) { S = defaults(); save(); PhotoStore.clear(); closeSheet(); render(); openWelcome(); } break;
+    case "resetall": if (confirm(`Erase ALL data on this device? This cannot be undone.${Sync.signedIn() ? " Your cloud backup stays in your account." : ""}`) && confirm("Really erase everything? Export a backup first if unsure.")) { Sync.forget(); S = defaults(); save(); PhotoStore.clear(); closeSheet(); render(); openWelcome(); } break;
+    case "cloudsignin": Sync.signIn(); break;
+    case "cloudsignout": Sync.signOut(); break;
     case "welcomesave": S.baby.name = $("#wl-name").value.trim(); S.baby.bday = $("#wl-bday").value; S.settings.onboarded = true; save(); closeSheet(); render(true); break;
     case "welcomeskip": S.settings.onboarded = true; save(); closeSheet(); render(true); break;
     case "print": window.print(); break;
@@ -856,7 +862,7 @@ document.addEventListener("change", e => {
     renderLog(true);
   } else if (t.id === "photoin" && t.files[0]) {
     const fid = t.dataset.id;
-    resizeImage(t.files[0], 192).then(url => { S.photos[fid] = url; if (save()) { openFood(fid); render(true); toast("Photo added"); } }, () => toast("Couldn’t read that image"));
+    resizeImage(t.files[0], 192).then(url => { S.photos[fid] = url; S.photoU[fid] = Date.now(); if (save()) { openFood(fid); render(true); toast("Photo added"); } }, () => toast("Couldn’t read that image"));
   } else if ((t.id === "ph-cam" || t.id === "ph-lib") && t.files.length) {
     collectLog();
     const files = [...t.files];
@@ -871,5 +877,6 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && !s
 
 /* ───────── boot ───────── */
 route();
+Sync.boot();
 if (!S.settings.onboarded && !S.baby.bday) openWelcome();
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => { });

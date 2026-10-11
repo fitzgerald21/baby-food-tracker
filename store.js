@@ -8,6 +8,8 @@ const PhotoStore = (() => {
   const mem = new Map();          // fallback if IndexedDB is unavailable (e.g. some private modes)
   let dbp = null, useMem = false;
   const urlCache = new Map();     // "id:kind" -> objectURL
+  let remote = null;              // cloud adapter, set by sync.js while signed in: { upload(id), download(id), remove(id) }
+  const gone = new Set();         // ids the cloud doesn't have, so we don't keep asking for them this session
 
   function open() {
     if (useMem) return Promise.reject(new Error("mem"));
@@ -27,11 +29,22 @@ const PhotoStore = (() => {
   async function put(id, rec) {            // rec: { blob, thumb, w, h, created }
     const row = { id, ...rec, created: rec.created || Date.now() };
     try { await req((await store("readwrite")).put(row)); } catch (e) { mem.set(id, row); }
+    gone.delete(id);
     urlCache.forEach((u, k) => { if (k.startsWith(id + ":")) { URL.revokeObjectURL(u); urlCache.delete(k); } });
+    if (remote) remote.upload(id);
   }
   async function getRow(id) {
     if (mem.has(id)) return mem.get(id);
-    try { return (await req((await store("readonly")).get(id))) || null; } catch (e) { return null; }
+    let row = null;
+    try { row = (await req((await store("readonly")).get(id))) || null; } catch (e) { }
+    if (!row && remote && !gone.has(id)) {          // added on another device: fetch it and keep a local copy
+      const got = await remote.download(id);
+      if (got) {
+        row = { id, ...got, created: Date.now() };
+        try { await req((await store("readwrite")).put(row)); } catch (e) { mem.set(id, row); }
+      } else gone.add(id);
+    }
+    return row;
   }
   async function url(id, kind) {           // kind: "full" | "thumb"
     const key = id + ":" + kind;
@@ -42,6 +55,7 @@ const PhotoStore = (() => {
   }
   async function remove(id) {
     mem.delete(id);
+    if (remote) remote.remove(id);
     try { await req((await store("readwrite")).delete(id)); } catch (e) { }
     ["full", "thumb"].forEach(k => { const u = urlCache.get(id + ":" + k); if (u) { URL.revokeObjectURL(u); urlCache.delete(id + ":" + k); } });
   }
@@ -71,5 +85,5 @@ const PhotoStore = (() => {
     const blob = await resizeBlob(file, 1280), thumb = await resizeBlob(blob, 240);
     return { blob, thumb };
   }
-  return { put, url, remove, ids, clear, prepare, exportAll, importAll };
+  return { put, get: getRow, url, remove, ids, clear, prepare, exportAll, importAll, setRemote: r => { remote = r; } };
 })();

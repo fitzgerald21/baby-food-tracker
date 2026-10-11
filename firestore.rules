@@ -1,0 +1,20 @@
+rules_version = '2';
+// This database is shared by every app in the come-back-fitz21 Firebase project.
+// The "Come back" rules below are kept exactly as they were in that project; Little Bites rules follow.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Come back: each signed-in user can read and write only their own document ---
+    match /users/{uid} {
+      match /sessions/{sid} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // --- Little Bites: each signed-in user can read and write only their own babies, logs and custom foods ---
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
