@@ -9,7 +9,7 @@ Little Bites works fully on the device by default. Signing in with Google (Setti
 
 ## Project setup
 - Little Bites lives in the same Firebase project as the Come back app: **`come-back-fitz21`**. It has its own web app registration ("Little Bites"), so each app has its own config.
-- **Firestore and Storage each have one ruleset per project, shared by every app in it.** `firestore.rules` and `storage.rules` are kept **identical** in the Little Bites and Come back repos, so deploying from either is safe. If you edit one, copy it to the other. The Come back block of `firestore.rules` is unchanged.
+- **Firestore and Storage each have one ruleset per project, shared by every app in it.** `firestore.rules` and `storage.rules` are kept **identical** in the Little Bites, Come back and One Line a Day repos, so deploying from either is safe. If you edit one, copy it to the others. The Come back block of `firestore.rules` is unchanged.
 - **Only fitzgeraldryan21@gmail.com can use Little Bites data** (`users/{uid}/babies/...` and Storage). To add someone, edit the email check in both rules files (`isOwner` in `storage.rules`) and redeploy.
 - **Cost guards:** photos are capped at 1 MB each by `storage.rules`, and the app stops backing up at 4000 photos (`MAX_PHOTOS` in `sync.js`, about 1.2 GB against the 5 GB free allowance). Google has no hard spending cap, so also keep a budget alert on the billing account (Cloud Console → Billing → Budgets & alerts).
 - The Storage bucket is in US-EAST1, one of the regions with a free tier.
